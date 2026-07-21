@@ -114,7 +114,8 @@ export function pageIllustrationUrls(
   const scenes: string[] = [];
   for (const record of generationRecords) {
     if (record.kind !== "image") continue;
-    const imageUrl = record.assetUrl ?? record.partialAssetUrls?.at(-1);
+    const imageUrl = record.assetUrl
+      ?? (record.status === "failed" ? undefined : record.partialAssetUrls?.at(-1));
     if (imageUrl && !scenes.includes(imageUrl)) scenes.push(imageUrl);
   }
 
@@ -140,7 +141,11 @@ export function recoverCollapsedPageIllustrations(
 ): StoryPage[] {
   const distinctAssignedImages = new Set(pages.map((page) => page.imageUrl).filter(Boolean));
   const hasMissingIllustration = pages.some((page) => !page.imageUrl);
-  return distinctAssignedImages.size <= 1 || hasMissingIllustration
+  const failedPartialUrls = new Set(generationRecords
+    .filter((record) => record.kind === "image" && record.status === "failed")
+    .flatMap((record) => record.partialAssetUrls ?? []));
+  const hasFailedIllustration = pages.some((page) => page.imageUrl && failedPartialUrls.has(page.imageUrl));
+  return distinctAssignedImages.size <= 1 || hasMissingIllustration || hasFailedIllustration
     ? assignPageIllustrations(pages, generationRecords, fallbackImageUrl)
     : pages;
 }

@@ -93,6 +93,26 @@ describe("story state", () => {
     ]);
   });
 
+  it("does not assign deleted partials from a failed image job", () => {
+    const state = createInitialStoryState();
+    const pages = makeFallbackPages(state).map((page, index) => ({
+      ...page,
+      imageUrl: index === 0 ? "/one.jpg" : index === 1 ? "/failed-partial.jpg" : "/two.jpg",
+    }));
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+      { id: "failed", kind: "image", model: "gpt-image-2", status: "failed", startedAt: "2", intent: "advance", partialAssetUrls: ["/failed-partial.jpg"] },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "3", intent: "advance", assetUrl: "/two.jpg" },
+    ] satisfies GenerationRecord[];
+
+    expect(pageIllustrationUrls(records, null)).toEqual(["/one.jpg", "/two.jpg", "/two.jpg"]);
+    expect(recoverCollapsedPageIllustrations(pages, records, "/two.jpg").map((page) => page.imageUrl)).toEqual([
+      "/one.jpg",
+      "/two.jpg",
+      "/two.jpg",
+    ]);
+  });
+
   it("repairs legacy books whose three page images collapsed to the final scene", () => {
     const state = createInitialStoryState();
     const pages = makeFallbackPages(state).map((page) => ({ ...page, imageUrl: "/three.jpg" }));
