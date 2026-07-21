@@ -50,7 +50,9 @@ export async function POST(request: Request, context: RouteContext) {
       instructions: turnInstructions(current.state),
       target: "next-story-step",
     });
+    await flushSessionPersistence(id);
     const plan = await planStoryTurn(current.state, parsed.data.text, parsed.data.author, current.safetyIdentifier);
+    await prepareSession(id);
     if (guideRecordId) completeTextGeneration(id, guideRecordId, JSON.stringify(plan));
     const planSafety = await checkTextSafety([
       plan.reflection,
@@ -74,6 +76,7 @@ export async function POST(request: Request, context: RouteContext) {
         instructions: pageComposerInstructions(compositionState),
         target: "three-page-story",
       });
+      await flushSessionPersistence(id);
       composed = await composePages(compositionState, current.safetyIdentifier);
       const pageSafety = await checkTextSafety(composed.pages.map((page) => page.text).join("\n"), current.safetyIdentifier);
       if (!pageSafety.allowed) {
@@ -81,9 +84,11 @@ export async function POST(request: Request, context: RouteContext) {
         await flushSessionPersistence(id);
         return apiError("The Creative Guide paused those pages. Try a different direction.", 422, "PAGE_GUARDRAIL");
       }
+      await prepareSession(id);
       if (compositionRecordId) completeTextGeneration(id, compositionRecordId, JSON.stringify({ usedFallback: composed.usedFallback, error: composed.error, pages: composed.pages.map(({ pageNumber, text }) => ({ pageNumber, text })) }));
     }
 
+    await prepareSession(id);
     const session = mutateSession(id, (state) => {
       let next = addContribution(state, {
         author: parsed.data.author,
@@ -116,6 +121,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ session, guide: { reflection: plan.reflection, question: plan.question }, visual: plan.visualIntent === "none" ? null : { intent: plan.visualIntent, prompt: plan.visualPrompt } });
   } catch (error) {
     const message = messageFromError(error);
+    await prepareSession(id);
     const latest = getSession(id)?.generationRecords.findLast((record) => (record.kind === "guide" || record.kind === "composition") && record.status === "started");
     if (latest) failTextGeneration(id, latest.id, "The Creative Guide could not complete this step.");
     await flushSessionPersistence(id);

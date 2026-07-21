@@ -1,7 +1,8 @@
 # Local Development
 
-WonderLoom is configured as a local application. No remote deployment or cloud
-storage is required.
+WonderLoom is local-first. No remote deployment or cloud storage is required
+for local development; the private Blob adapter activates only when both the
+Vercel runtime marker and its connected storage token are present.
 
 ## Prerequisites
 
@@ -61,6 +62,7 @@ The typed experience remains usable when microphone access is declined.
 | `npm test` | Run the Vitest suite once |
 | `npm run test:watch` | Run Vitest interactively |
 | `npm run test:e2e` | Run Playwright browser journeys |
+| `WONDERLOOM_BASE_URL=https://example.vercel.app npm run test:deployment` | Run the billable disposable deployment acceptance journey |
 
 Install Playwright's browser once if needed:
 

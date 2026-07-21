@@ -24,9 +24,11 @@ the author.
 
 **Devpost submission:** [https://devpost.com/software/wonderloom](https://devpost.com/software/wonderloom)
 
-This repository is intentionally documented as a **local application**. It
-contains no hosted deployment configuration, committed credentials, child
-profiles, analytics integration, or generated story data.
+This repository is intentionally **local-first**. Local development needs no
+cloud database, while an optional Vercel runtime adapter uses a private Blob
+store for cross-invocation continuity. The repository contains no deployment
+metadata, committed credentials, child profiles, analytics integration, or
+generated story data.
 
 ## What This Repository Contains
 
@@ -123,7 +125,7 @@ The creative loop is deliberately small:
 3. **Respond** — answer one focused follow-up question.
 4. **Revise** — change, expand, reject, or undo part of the story.
 5. **Create** — arrange the accepted decisions into three editable pages.
-6. **Finish** — give the book a title and save the completed story locally.
+6. **Finish** — give the book a title and save the completed story.
 
 The result is not generated from a single prompt. It is constructed through a
 sequence of decisions made by the child.
@@ -167,7 +169,7 @@ calls, images, and narration.
 </table>
 
 Only a titled, complete, explicitly finished three-page book appears in the
-local library. Drafts never masquerade as finished work.
+finished-story library. Drafts never masquerade as finished work.
 
 ![WonderLoom finished-story library](image-assets/06-finished-story-library.png)
 
@@ -219,7 +221,7 @@ flowchart LR
     State --> Pages["Three-page composition"]
     Pages --> Title["Child-selected title"]
     Title --> Finish["Completeness gate"]
-    Finish --> Archive["Local finished-story archive"]
+    Finish --> Archive["Finished-story archive"]
     Archive --> TTS["Coral story narration"]
 ```
 
@@ -298,21 +300,27 @@ instead of overwriting the child's newer direction.
 
 See [Progressive image pipeline](docs/progressive-image-pipeline.md).
 
-### Finished-story archive
+### Session and finished-story storage
 
-Local runtime storage has two separate roles:
+Storage is selected at runtime:
 
-- `public/generated/<session-id>/` stores generated images and MP3 narration.
-- `data/wonderloom/sessions/<session-id>.json` stores verified finished books.
+- Local development keeps active drafts in memory, generated media under
+  `public/generated/<session-id>/`, and verified finished books under
+  `data/wonderloom/sessions/`.
+- Vercel uses a private Blob store for active session continuity, finished
+  books, generated illustrations, and narration. Media reaches the browser
+  through a same-origin route rather than a public storage URL.
 
-Active drafts remain in server memory and are not library entries. A finished
-book must have a child-confirmed non-placeholder title, exactly three ready
-pages with non-empty text, the `finished` phase, and an explicit successful
-finalization action.
+Active cloud drafts expire logically after 24 hours and never appear in the
+library. A finished book must have a child-confirmed non-placeholder title,
+exactly three ready pages with non-empty text, the `finished` phase, and an
+explicit successful finalization action. Deleting a session also removes its
+private generated media.
 
-Writes use a same-directory temporary file and atomic rename. Narration cache
-keys include the model, voice, exact text, and scene instructions, so revised
-text receives fresh audio while unchanged text reuses its MP3.
+Local completed-book writes use a same-directory temporary file and atomic
+rename. Narration cache keys include the model, voice, exact text, and scene
+instructions, so revised text receives fresh audio while unchanged text reuses
+its MP3.
 
 See [Story archive and generation provenance](docs/story-archive.md).
 
@@ -351,7 +359,7 @@ as system boundaries:
 - Raw microphone recordings are not stored.
 - There are no child accounts, social features, analytics, engagement streaks,
   or recommendation feeds.
-- Only explicitly finished stories are saved locally.
+- Only explicitly finished stories appear in the library.
 - Real credentials and generated stories are excluded from Git.
 
 Read [Safety and privacy](docs/safety-and-privacy.md) for the trust boundaries,

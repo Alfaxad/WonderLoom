@@ -44,6 +44,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const recordId = startSpeechGeneration(id, { target, sourceHash, prompt: input, instructions });
   if (!recordId) return apiError("This saved story could not be found.", 404, "SESSION_NOT_FOUND");
+  await flushSessionPersistence(id);
   try {
     const response = await getOpenAI().audio.speech.create({
       model: BOOK_NARRATION_MODEL,
@@ -54,11 +55,13 @@ export async function POST(request: Request, context: RouteContext) {
     });
     const bytes = new Uint8Array(await response.arrayBuffer());
     const audioUrl = await persistNarrationAudio(id, target, sourceHash, bytes);
+    await prepareSession(id);
     completeSpeechGeneration(id, recordId, audioUrl);
     await flushSessionPersistence(id);
     return NextResponse.json({ audioUrl, cached: false, disclosure: "AI-generated narration · Coral voice" });
   } catch (error) {
     const message = messageFromError(error);
+    await prepareSession(id);
     failSpeechGeneration(id, recordId, "Coral could not prepare this narration.");
     await flushSessionPersistence(id);
     console.error("[WonderLoom narration]", message);

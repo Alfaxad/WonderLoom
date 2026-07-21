@@ -55,6 +55,7 @@ export async function POST(request: Request, context: RouteContext) {
           if (frame.kind === "partial") {
             const partialIndex = Math.min(frame.partialIndex, messages.length - 1);
             const imageUrl = await persistPartialImage(id, started.jobRevision!, partialIndex, frame.bytes, frame.format);
+            await prepareSession(id);
             recordVisualPartial(id, started.jobRevision!, imageUrl);
             await flushSessionPersistence(id);
             send({
@@ -68,6 +69,7 @@ export async function POST(request: Request, context: RouteContext) {
           }
 
           const imageUrl = await persistGeneratedImage(id, started.jobRevision!, frame.bytes, frame.format);
+          await prepareSession(id);
           const result = commitVisualIfCurrent(id, started.jobRevision!, imageUrl, parsed.data.prompt);
           await flushSessionPersistence(id);
           if (result.stale) {
@@ -80,6 +82,7 @@ export async function POST(request: Request, context: RouteContext) {
       } catch (error) {
         const message = messageFromError(error);
         await removeVisualJobAssets(id, started.jobRevision!);
+        await prepareSession(id);
         const session = failVisualJobIfCurrent(id, started.jobRevision!, "Painting was interrupted before the final scene arrived.");
         await flushSessionPersistence(id);
         if (!abortController.signal.aborted) {
@@ -98,8 +101,12 @@ export async function POST(request: Request, context: RouteContext) {
     },
     cancel() {
       abortController.abort();
-      void removeVisualJobAssets(id, started.jobRevision!);
-      failVisualJobIfCurrent(id, started.jobRevision!, "Painting was interrupted before the final scene arrived.");
+      void (async () => {
+        await removeVisualJobAssets(id, started.jobRevision!);
+        await prepareSession(id);
+        failVisualJobIfCurrent(id, started.jobRevision!, "Painting was interrupted before the final scene arrived.");
+        await flushSessionPersistence(id);
+      })();
     },
   });
 

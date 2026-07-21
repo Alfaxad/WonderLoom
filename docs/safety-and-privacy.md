@@ -2,7 +2,7 @@
 
 ## Scope
 
-WonderLoom is a research-informed local prototype, not a certified child-safety
+WonderLoom is a research-informed prototype, not a certified child-safety
 platform or a production compliance program. This document distinguishes what
 the software currently enforces from what a public child-facing service would
 still need.
@@ -23,9 +23,9 @@ AI authorship, secret leakage, path traversal, stale asynchronous results,
 incomplete drafts being presented as finished, and local users seeing another
 local user's saved stories.
 
-This build assumes a trusted person controls the computer and local server. It
-does not provide accounts, authentication, authorization, tenant isolation, or
-encrypted local storage.
+This build assumes a trusted person controls access to the local or temporary
+hosted URL. It does not provide accounts, authentication, authorization, tenant
+isolation, or a family-level access-control boundary.
 
 ## Implemented controls
 
@@ -59,10 +59,12 @@ by the child.
 
 ### Credential boundaries
 
-The permanent OpenAI key is loaded only from the ignored `.env.local` file.
+The permanent OpenAI key is loaded only from the ignored `.env.local` file or a
+server-side Vercel environment variable.
 Realtime voice receives a short-lived client credential from a server route.
-Generated assets use same-origin local paths. No credential or generated child
-data belongs in Git.
+Generated assets use same-origin application paths. Cloud media and session
+objects are held in a private Blob store and never exposed through raw storage
+URLs. No credential or generated child data belongs in Git.
 
 ### Output and media handling
 
@@ -80,10 +82,10 @@ arbitrary text and is explicitly disclosed as synthetic speech.
 | Child account/profile | No | None |
 | Age band | Chosen by adult | Session/book only |
 | Reading mode | Chosen by adult | Session/book only |
-| Story contributions | Yes | Memory for drafts; local JSON after completion |
+| Story contributions | Yes | Local memory for drafts; private 24-hour cloud draft continuity; completed-book storage after finalization |
 | Raw microphone audio | Used for live WebRTC when enabled | Not stored by WonderLoom |
 | Transcription | Used in the live interaction | Reflected only through accepted contributions |
-| Generated images/audio | Yes | Local generated-media directory |
+| Generated images/audio | Yes | Ignored local media or private cloud objects |
 | Analytics/advertising identifiers | No integration | None |
 | Personality, emotion, ability, development | Not inferred | None |
 
@@ -101,8 +103,8 @@ persisted and revisitable.
 
 ## Known limitations
 
-- There is no authentication or per-person access control. Anyone using the
-  same local server can see its finished-story shelf.
+- There is no authentication or per-person access control. Anyone with access
+  to the same local server or temporary hosted URL can see its finished shelf.
 - Local JSON and media are not encrypted at rest.
 - Deleting a library entry is not a forensic secure erase.
 - Regex checks cannot recognize every form of identifying information.

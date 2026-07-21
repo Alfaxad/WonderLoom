@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/app/api/_shared";
+import { removeSessionAssets } from "@/server/image-assets";
 import { deleteSession, flushSessionPersistence, getSession, prepareSession } from "@/server/session-store";
 
 interface RouteContext { params: Promise<{ id: string }> }
@@ -17,5 +18,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
   await prepareSession(id);
   deleteSession(id);
   await flushSessionPersistence(id);
+  await removeSessionAssets(id);
   return new NextResponse(null, { status: 204 });
 }

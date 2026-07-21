@@ -13,20 +13,35 @@
 Repeated on 22 July 2026 before the repository was prepared for public release:
 
 - `npm run lint`: passed.
-- `npm test -- --run`: 5 test files and 17 tests passed.
+- `npm test -- --run`: 6 test files and 20 tests passed.
 - `npm run build`: production compilation, TypeScript, route collection, and static generation passed.
 - `npx playwright test e2e/product-journey.spec.ts`: all 6 desktop and mobile journeys passed.
 - Local Markdown audit: all relative links across 41 Markdown files resolve.
 - Secret-pattern and ignore-rule audit: no credential-shaped values were found in publishable files; local environment files, Vercel metadata, generated images, story archives, test output, and planning files remain ignored.
 - Repository-size audit: no publishable file exceeds GitHub's 100 MB per-file limit; the largest bundled paper is approximately 25 MB.
 - Security diff scan: all changed source-like files were reviewed, reported issues were fixed and revalidated, and no reportable findings remain.
-- Deployment retirement: the temporary Vercel project and its private object store were removed; the previous public URL now returns `404`.
+- `npm audit --omit=dev`: two transitive advisory families remain at moderate severity. The Hono finding is confined to an unused Windows static-file adapter pulled through the Agents SDK's MCP dependency, while the PostCSS finding is in Next.js's build-time CSS dependency; npm offers only breaking downgrades, so neither was force-applied. Reassess when upstream patch releases become available.
+- Vercel project metadata and environment values remain untracked and ignored.
+
+## Temporary Vercel deployment verification
+
+Repeated on 22 July 2026 after adding the private Blob runtime adapter:
+
+- Production build completed successfully and exposed every expected dynamic API route, including the private `/api/media/[...path]` proxy.
+- A disposable active session survived repeated process restarts during isolated cold-recovery testing and accepted a later contribution.
+- The live verifier passed 20 checks: setup, 12 concurrent session recoveries, Realtime token configuration, contribution, narrow edit, undo, structured guide turn, three streamed image partials and final image, media delivery, three-page composition, editable title and page, finalization, library inclusion, story route, Coral narration, narration caching, and cleanup.
+- Live browser checks passed on desktop and 390 px mobile for welcome, setup, studio layout, AI disclosure, generated assets, keyboard access, reduced motion, and horizontal overflow.
+- A real headless WebRTC connection received a `gpt-realtime-2.1-mini` session using Marin, reached the listening/speaking flow, passed the output safety call, and disconnected cleanly.
+- The disposable completed book returned `404` after deletion, the live library returned empty, and the private Blob store contained no remaining session or media objects.
+- Error-level Vercel logs for the acceptance window were empty.
+- `wonderloom-openai.vercel.app` is the sole friendly WonderLoom alias. Vercel's immutable deployment URL still exists as part of the platform.
 
 ## Finished-book archive checks
 
 - Cleared the previous local archive and generated runtime assets.
 - A newly created unfinished session produced no archive JSON and did not appear in `/api/library`.
-- After a cold server restart, that unfinished session returned `404` and the library remained empty.
+- In local mode, a cold server restart discarded that unfinished session and the library remained empty.
+- In Vercel mode, active drafts recovered from private Blob storage across cold starts but remained absent from the library.
 - A disposable book with a confirmed title and three ready pages finalized successfully, received a completion timestamp, appeared in the library, and produced one archive JSON.
 - The disposable completed book was removed and the final development server was cold-started with an empty library.
 
@@ -44,4 +59,4 @@ Repeated on 22 July 2026 before the repository was prepared for public release:
 
 - Raw audio is not stored.
 - No accounts, long-term child profiles, social features, analytics dashboard, or production database.
-- Finished stories and generated assets use local disk storage; active drafts survive only for the running server process. Production should move finished books to authenticated database and private object storage adapters.
+- Local development uses ignored disk for completed books and media, while active drafts survive only for the running process. The temporary Vercel runtime uses private Blob objects with a 24-hour logical draft lifetime. It is restart-safe but is not a substitute for authenticated, tenant-isolated production storage.

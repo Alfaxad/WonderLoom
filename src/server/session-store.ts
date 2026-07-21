@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { BOOK_NARRATION_MODEL } from "@/lib/openai-models";
 import { cloneStoryState, createInitialStoryState, isFinishedBook } from "@/lib/story-state";
 import type { GenerationRecord, SavedStorySummary, SetupPreferences, StoryState, VisualIntent, WonderSession } from "@/lib/types";
+import { deletePrivateBlobs, listPrivateBlobs, readPrivateBlob, SESSION_BLOB_PREFIX, usesRemoteStorage, writePrivateBlob } from "@/server/blob-storage";
 
 const MAX_HISTORY = 100;
+const ACTIVE_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const STORAGE_ROOT = join(/*turbopackIgnore: true*/ process.cwd(), "data", "wonderloom", "sessions");
-const LOCAL_PERSISTENCE_ENABLED = process.env.NODE_ENV !== "test";
+const LOCAL_PERSISTENCE_ENABLED = process.env.NODE_ENV !== "test" && !usesRemoteStorage();
 
 declare global {
   var __wonderloomSessions: Map<string, WonderSession> | undefined;
@@ -89,11 +91,39 @@ export function createSession(setup: SetupPreferences): WonderSession {
 }
 
 export async function prepareSession(id: string): Promise<void> {
-  void id;
+  if (!usesRemoteStorage()) return;
+  if (!isValidSessionId(id)) {
+    sessions.delete(id);
+    return;
+  }
+  try {
+    const loaded = await loadRemoteSession(`${SESSION_BLOB_PREFIX}${id}.json`);
+    if (!loaded) {
+      sessions.delete(id);
+      return;
+    }
+    if (isExpiredActiveSession(loaded)) {
+      sessions.delete(id);
+      await deletePrivateBlobs(`${SESSION_BLOB_PREFIX}${id}.json`);
+      return;
+    }
+    sessions.set(id, loaded);
+  } catch (error) {
+    if (!sessions.has(id)) throw error;
+    console.error(`[WonderLoom persistence] Could not refresh ${id}; retaining the in-process copy.`, error);
+  }
 }
 
 export async function flushSessionPersistence(id: string): Promise<void> {
-  void id;
+  if (!usesRemoteStorage()) return;
+  if (!isValidSessionId(id)) return;
+  const session = sessions.get(id);
+  const pathname = `${SESSION_BLOB_PREFIX}${id}.json`;
+  if (!session) {
+    await deletePrivateBlobs(pathname);
+    return;
+  }
+  await writePrivateBlob(pathname, `${JSON.stringify(session)}\n`, "application/json");
 }
 
 export function getSession(id: string): WonderSession | null {
@@ -104,23 +134,31 @@ export function getSession(id: string): WonderSession | null {
 export function listSavedStories(): SavedStorySummary[] {
   return [...sessions.values()]
     .filter(isPersistableSession)
-    .map((session) => ({
-      id: session.id,
-      title: session.state.title,
-      titleConfirmed: session.state.titleConfirmed,
-      phase: session.state.phase,
-      coverImageUrl: session.state.currentImageUrl,
-      pageCount: session.state.pages.length,
-      contributionCount: session.state.contributions.length,
-      generationCount: session.generationRecords.length,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-    }))
+    .map(toSavedStorySummary)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
 export async function listSavedStoriesAsync(): Promise<SavedStorySummary[]> {
-  return listSavedStories();
+  if (!usesRemoteStorage()) return listSavedStories();
+  const blobs = await listPrivateBlobs(SESSION_BLOB_PREFIX);
+  const loaded = await Promise.all(blobs.map(async (blob) => {
+    try {
+      const session = await loadRemoteSession(blob.pathname);
+      if (session && isExpiredActiveSession(session)) {
+        await deletePrivateBlobs(blob.pathname);
+        return null;
+      }
+      if (session) sessions.set(session.id, session);
+      return session;
+    } catch (error) {
+      console.error(`[WonderLoom persistence] Could not read ${blob.pathname}.`, error);
+      return null;
+    }
+  }));
+  return loaded
+    .filter((session): session is WonderSession => Boolean(session && isPersistableSession(session)))
+    .map(toSavedStorySummary)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
 export function markSessionComplete(id: string): WonderSession | null {
@@ -376,4 +414,34 @@ export function clearSessionsForTest(): void {
 
 function isPersistableSession(session: WonderSession): boolean {
   return Boolean(session.completedAt) && isFinishedBook(session.state);
+}
+
+function isExpiredActiveSession(session: WonderSession): boolean {
+  return !session.completedAt && Date.now() - Date.parse(session.updatedAt) > ACTIVE_SESSION_TTL_MS;
+}
+
+function isValidSessionId(id: string): boolean {
+  return /^[a-f0-9-]{36}$/i.test(id);
+}
+
+async function loadRemoteSession(pathname: string): Promise<WonderSession | null> {
+  const blob = await readPrivateBlob(pathname);
+  if (!blob || blob.statusCode !== 200) return null;
+  const text = await new Response(blob.stream).text();
+  return normalizeSession(JSON.parse(text) as WonderSession);
+}
+
+function toSavedStorySummary(session: WonderSession): SavedStorySummary {
+  return {
+    id: session.id,
+    title: session.state.title,
+    titleConfirmed: session.state.titleConfirmed,
+    phase: session.state.phase,
+    coverImageUrl: session.state.currentImageUrl,
+    pageCount: session.state.pages.length,
+    contributionCount: session.state.contributions.length,
+    generationCount: session.generationRecords.length,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  };
 }

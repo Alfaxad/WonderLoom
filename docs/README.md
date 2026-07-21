@@ -1,12 +1,13 @@
 # WonderLoom Documentation
 
-This directory describes WonderLoom as both a product experiment and a local
-software system. The documents separate the intended child experience from the
+This directory describes WonderLoom as both a product experiment and a
+local-first software system with an optional private-storage Vercel runtime. The documents separate the intended child experience from the
 technical mechanisms, evidence base, safety boundaries, and verification work
 behind it.
 
-WonderLoom is intentionally documented for local use. Generated stories and
-media stay on the machine running the application and are excluded from Git.
+Local development keeps generated stories and media on the machine running the
+application. The Vercel adapter keeps them in private Blob storage. Neither
+runtime commits them to Git.
 
 ## Start here
 
@@ -54,7 +55,7 @@ not supersede them.
 
 Runtime data is deliberately absent from the repository:
 
-- `data/wonderloom/` contains locally saved, completed session JSON.
+- `data/wonderloom/` contains completed session JSON in local development.
 - `public/generated/` contains generated illustrations, partials, and audio.
 - `.env.local` contains the developer's server-side OpenAI credential.
 

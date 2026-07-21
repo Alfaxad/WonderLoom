@@ -31,7 +31,7 @@ The API may return fewer than three partials when the final image completes quic
 
 ## Storage and cleanup
 
-Temporary frames use `scene-NNN-partial-N.jpg`. They are retained with the generation record so a saved story preserves how its illustration emerged. Completed scenes remain normal JPEG assets under `public/generated/<session-id>/`.
+Temporary frames use `scene-NNN-partial-N.jpg`. They are retained with the generation record so a saved story preserves how its illustration emerged. Local development stores the JPEGs under `public/generated/<session-id>/`. Vercel stores them in private Blob storage and streams them through the validated same-origin `/api/media/...` route, so neither storage credentials nor public Blob URLs reach the browser.
 
 ## OpenAI API basis
 

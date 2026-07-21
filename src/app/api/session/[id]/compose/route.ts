@@ -23,6 +23,7 @@ export async function POST(_request: Request, context: RouteContext) {
     instructions: pageComposerInstructions(current.state),
     target: "three-page-story",
   });
+  await flushSessionPersistence(id);
   try {
     const composed = await composePages(current.state, current.safetyIdentifier);
     const pageSafety = await checkTextSafety(composed.pages.map((page) => page.text).join("\n"), current.safetyIdentifier);
@@ -31,6 +32,7 @@ export async function POST(_request: Request, context: RouteContext) {
       await flushSessionPersistence(id);
       return apiError("The Creative Guide paused those pages. Try a different direction.", 422, "PAGE_GUARDRAIL");
     }
+    await prepareSession(id);
     if (recordId) completeTextGeneration(id, recordId, JSON.stringify({ usedFallback: composed.usedFallback, error: composed.error, pages: composed.pages.map(({ pageNumber, text }) => ({ pageNumber, text })) }));
     const session = mutateSession(id, (state) => addContribution({
       ...state,
@@ -46,6 +48,7 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ session });
   } catch (error) {
     const message = messageFromError(error);
+    await prepareSession(id);
     if (recordId) failTextGeneration(id, recordId, "The Creative Guide could not arrange these pages.");
     await flushSessionPersistence(id);
     console.error("[WonderLoom composition]", message);

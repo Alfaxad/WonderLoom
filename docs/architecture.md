@@ -7,11 +7,12 @@ story creation. Its architecture is designed around one invariant: model output
 may assist, reflect, arrange, illustrate, or narrate, but it may not silently
 replace the child's canonical decisions.
 
-The repository contains one application process and no separate database,
-queue, account service, analytics service, or remote object store. The browser
-hosts the creative interface and Realtime media connection. Next.js route
-handlers own OpenAI credentials, validate requests, apply safety checks, mutate
-canonical state, and persist only completed books and generated assets locally.
+The browser hosts the creative interface and Realtime media connection. Next.js
+route handlers own OpenAI credentials, validate requests, apply safety checks,
+and mutate canonical state. Local development uses memory and ignored disk
+paths. A Vercel deployment switches to a private Blob adapter so sessions and
+generated media survive serverless instance changes without making storage
+URLs public. There is no account service, analytics service, or child profile.
 
 ## Component map
 
@@ -32,7 +33,7 @@ flowchart TB
       Canon["Canonical WonderSession"]
       Visual["Progressive image director"]
       Speech["Narration service"]
-      Store["Local completion-gated archive"]
+      Store["Runtime-selected private storage"]
     end
 
     subgraph OpenAI
@@ -88,8 +89,9 @@ The important invariants are:
 The browser submits age band, reading mode, voice preference, and adult
 confirmation to `POST /api/session`. The server validates the payload, creates a
 random session ID and a stable hashed safety identifier, and returns the initial
-session. Active drafts live in process memory so an unfinished story does not
-appear in the library or survive as a misleading completed artifact.
+session. Locally, active drafts live in process memory. On Vercel, they are
+stored privately for cross-invocation continuity and expire logically after 24
+hours. In either mode, an unfinished story never appears in the library.
 
 ### 2. Typed creative turn
 
@@ -122,8 +124,10 @@ the typed path remains complete.
 `POST /api/session/:id/visual` starts an NDJSON stream. The server increments the
 visual job revision, records a generation attempt, and requests up to three
 partial images followed by a final from `gpt-image-2`. For edits, it supplies the
-current locally generated scene as a reference. Each frame is written beneath
-`public/generated/<session>/` and emitted as a same-origin URL.
+current generated scene as a reference. Each frame is written to the selected
+media adapter and emitted as a same-origin URL. Private cloud objects are read
+through `/api/media/:path`; their Blob URLs and credentials never enter story
+state or browser code.
 
 The browser interprets the sequence as sketch, color, details, and final. Before
 committing any frame, the server compares the job revision with the session's
@@ -137,11 +141,12 @@ state while preserving story text and decisions.
 using a structured model response. It does not finish the book. Page text may be
 changed through the page route. The child then supplies and confirms the title
 through the state route. `POST /api/session/:id/finalize` runs the completeness
-gate, enters `finished`, adds the completion timestamp, and atomically writes
-the session JSON to `data/wonderloom/`.
+gate, enters `finished`, and adds the completion timestamp. Local mode writes
+the session JSON under `data/wonderloom/`; Vercel writes it to the connected
+private Blob store.
 
 Only this finalization path creates a library entry. Incomplete sessions and
-abandoned drafts remain transient.
+abandoned drafts remain absent from the library.
 
 ### 6. Narration
 
@@ -149,7 +154,7 @@ abandoned drafts remain transient.
 a numbered page. It hashes the source text and checks the generation log for a
 matching completed asset. A cache miss calls `gpt-4o-mini-tts` with the Coral
 voice and scene-sensitive instructions for energetic, sympathetic story
-narration. Audio is stored locally and the response carries an explicit
+narration. Audio is stored through the selected media adapter and the response carries an explicit
 AI-generated narration disclosure.
 
 ## API surface
@@ -169,7 +174,8 @@ AI-generated narration disclosure.
 | `/api/session/:id/speech` | `POST` | Generate or reuse Coral narration for a constrained target |
 | `/api/realtime/session` | `POST` | Mint a short-lived Realtime browser credential |
 | `/api/safety/text` | `POST` | Run reusable text safety checks |
-| `/api/library` | `GET` | List summaries of completed local books |
+| `/api/library` | `GET` | List summaries of completed books |
+| `/api/media/:path` | `GET` | Stream private generated media through a constrained same-origin path |
 
 ## Model responsibilities
 
@@ -189,11 +195,13 @@ project with access to those models.
 
 | Data | Location | Lifetime | Git status |
 |---|---|---|---|
-| Active draft | Server process memory | Until process exit or deletion | Never tracked |
-| Completed session | `data/wonderloom/sessions/<id>.json` | Until local deletion/reset | Ignored |
-| Image partials/finals | `public/generated/<id>/` | Until local deletion/reset | Ignored |
-| Narration audio | `public/generated/<id>/audio/` | Until local deletion/reset | Ignored |
+| Active draft (local) | Server process memory | Until process exit or deletion | Never tracked |
+| Active draft (Vercel) | Private Blob JSON | 24-hour logical lifetime unless completed | Never tracked |
+| Completed session | Local ignored JSON or private Blob JSON | Until deletion/reset | Never tracked |
+| Image partials/finals | Local ignored media or private Blob objects | Until session deletion | Never tracked |
+| Narration audio | Local ignored media or private Blob objects | Until session deletion | Never tracked |
 | API credential | `.env.local` | Developer managed | Ignored |
+| Blob credential | Vercel environment only | Deployment managed | Ignored |
 | Research and documentation | Repository | Versioned | Tracked |
 
 JSON persistence uses a write-then-rename operation so an interrupted save does
@@ -206,14 +214,15 @@ filters against the same completeness predicate used by finalization.
   state is not authoritative.
 - **Application to model:** schemas constrain structured output and application
   rules decide whether a patch can be applied.
-- **Application to filesystem:** generated paths are normalized and checked to
-  remain under the generated-media root.
+- **Application to storage:** local paths remain under the generated-media root;
+  remote objects use fixed prefixes, private access, constrained names, and a
+  same-origin streaming route.
 - **Long-running image work:** revision comparison prevents out-of-order writes.
 - **Network/model errors:** story state remains available; illustration and
   narration expose retryable states rather than deleting authored work.
 - **Realtime failure:** voice can disconnect without disabling typed creation.
-- **Process restart:** drafts disappear by design; only explicitly completed
-  books are restored.
+- **Process restart:** local drafts disappear by design; Vercel drafts reload
+  from private storage so a serverless instance change does not end the studio.
 
 ## Verification strategy
 

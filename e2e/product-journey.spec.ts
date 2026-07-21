@@ -38,6 +38,8 @@ test("adult setup opens a keyboard-usable studio with explicit AI identity", asy
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
   await page.screenshot({ path: `/tmp/wonderloom-${testInfo.project.name}-studio.png`, fullPage: true });
+  const sessionId = new URL(page.url()).searchParams.get("session");
+  if (sessionId) await page.request.delete(`/api/session/${sessionId}`);
 });
 
 test("reduced motion preserves the complete welcome content", async ({ page }) => {

@@ -20,5 +20,7 @@ test("the browser connects and can interrupt the Realtime Creative Guide", async
   expect((await guardedResponsePromise).ok()).toBe(true);
   await page.getByRole("button", { name: "Stop voice" }).click();
   await expect(page.getByText(/Voice is off/i)).toBeVisible();
+  const sessionId = new URL(page.url()).searchParams.get("session");
+  if (sessionId) await page.request.delete(`/api/session/${sessionId}`);
   await context.close();
 });

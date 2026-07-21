@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:deployment": "node scripts/verify-deployment.mjs"
   },
   "dependencies": {
-    "@openai/agents": "^0.13.4",
+    "@openai/agents": "^0.13.5",
+    "@vercel/blob": "^2.6.1",
     "lucide-react": "^0.468.0",
     "motion": "^12.42.2",
     "next": "^16.2.10",
