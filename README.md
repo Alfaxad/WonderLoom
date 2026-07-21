@@ -627,7 +627,7 @@ If you reference the software or its design thesis, cite the repository:
 
 ```bibtex
 @software{wonderloom2026,
-  author = {Alfaxad Eyembe},
+  author = {Alfaxad Eyembe, Zebo Furqarzoda},
   title = {WonderLoom: A Tiny Studio for Big Imagination},
   year = {2026},
   url = {https://github.com/Alfaxad/WonderLoom},
