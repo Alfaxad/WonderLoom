@@ -62,6 +62,37 @@ describe("story state", () => {
     expect(pageIllustrationUrls(records, null)).toEqual(["/one.jpg", "/two.jpg", "/two.jpg"]);
   });
 
+  it("reuses a single available illustration across all three pages", () => {
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+    ] satisfies GenerationRecord[];
+    const pages = makeFallbackPages(createInitialStoryState());
+
+    expect(assignPageIllustrations(pages, records, null).map((page) => page.imageUrl)).toEqual([
+      "/one.jpg",
+      "/one.jpg",
+      "/one.jpg",
+    ]);
+  });
+
+  it("fills a missing restored page with the newest available illustration", () => {
+    const state = createInitialStoryState();
+    const pages = makeFallbackPages(state).map((page, index) => ({
+      ...page,
+      imageUrl: index === 0 ? "/one.jpg" : index === 1 ? "/two.jpg" : null,
+    }));
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "2", intent: "advance", assetUrl: "/two.jpg" },
+    ] satisfies GenerationRecord[];
+
+    expect(recoverCollapsedPageIllustrations(pages, records, "/two.jpg").map((page) => page.imageUrl)).toEqual([
+      "/one.jpg",
+      "/two.jpg",
+      "/two.jpg",
+    ]);
+  });
+
   it("repairs legacy books whose three page images collapsed to the final scene", () => {
     const state = createInitialStoryState();
     const pages = makeFallbackPages(state).map((page) => ({ ...page, imageUrl: "/three.jpg" }));

@@ -120,9 +120,8 @@ export function pageIllustrationUrls(
 
   const selected = scenes.slice(-3);
   if (selected.length === 0) return [fallbackImageUrl, fallbackImageUrl, fallbackImageUrl];
-  if (selected.length === 1) return [selected[0], selected[0], selected[0]];
-  if (selected.length === 2) return [selected[0], selected[1], selected[1]];
-  return selected;
+  const newestAvailableScene = selected.at(-1)!;
+  return Array.from({ length: 3 }, (_, index) => selected[index] ?? newestAvailableScene);
 }
 
 export function assignPageIllustrations(
@@ -140,7 +139,8 @@ export function recoverCollapsedPageIllustrations(
   fallbackImageUrl: string | null,
 ): StoryPage[] {
   const distinctAssignedImages = new Set(pages.map((page) => page.imageUrl).filter(Boolean));
-  return distinctAssignedImages.size <= 1
+  const hasMissingIllustration = pages.some((page) => !page.imageUrl);
+  return distinctAssignedImages.size <= 1 || hasMissingIllustration
     ? assignPageIllustrations(pages, generationRecords, fallbackImageUrl)
     : pages;
 }
