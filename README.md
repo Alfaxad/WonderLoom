@@ -1,6 +1,7 @@
 # **WonderLoom: A tiny studio for big imagination**
 
 [![YouTube Demo](https://img.shields.io/badge/YouTube-Watch%20the%20demo-FF0000?logo=youtube&logoColor=white)](https://youtu.be/dgalteGw8Es)
+[![Devpost](https://img.shields.io/badge/Devpost-View%20the%20project-003E54?logo=devpost&logoColor=white)](https://devpost.com/software/wonderloom)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-Multimodal%20creative%20guide-412991?logo=openai&logoColor=white)](https://developers.openai.com/)
 [![Research](https://img.shields.io/badge/Research-13%20papers%20%2B%2026%20reports-4B285B)](reports/README.md)
@@ -20,6 +21,8 @@ the author.
 ![WonderLoom welcome screen](image-assets/01-welcome.png)
 
 **Video walkthrough:** [https://youtu.be/dgalteGw8Es](https://youtu.be/dgalteGw8Es)
+
+**Devpost submission:** [https://devpost.com/software/wonderloom](https://devpost.com/software/wonderloom)
 
 This repository is intentionally documented as a **local application**. It
 contains no hosted deployment configuration, committed credentials, child
