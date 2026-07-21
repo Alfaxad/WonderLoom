@@ -19,6 +19,7 @@ The API may return fewer than three partials when the final image completes quic
 - Partial base64 payloads never enter session state or history.
 - A newer visual job supersedes an older job without unrelated story edits invalidating the active image request.
 - The client aborts an older stream when a newer visual request begins.
+- Independent generated artifacts form the page-image timeline. A direct `transform` updates the active page after composition, while saved pre-composition outputs remain available when the three pages are bound.
 
 ## Child-facing experience
 

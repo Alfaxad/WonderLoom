@@ -25,7 +25,7 @@ export async function POST(_request: Request, context: RouteContext) {
   });
   await flushSessionPersistence(id);
   try {
-    const composed = await composePages(current.state, current.safetyIdentifier);
+    const composed = await composePages(current.state, current.safetyIdentifier, current.generationRecords);
     const pageSafety = await checkTextSafety(composed.pages.map((page) => page.text).join("\n"), current.safetyIdentifier);
     if (!pageSafety.allowed) {
       if (recordId) failTextGeneration(id, recordId, "The composed pages did not pass the child-safety check.");

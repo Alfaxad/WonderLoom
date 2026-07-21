@@ -1,4 +1,4 @@
-import type { Contribution, StoryPage, StoryPhase, StoryState } from "@/lib/types";
+import type { Contribution, GenerationRecord, StoryPage, StoryPhase, StoryState } from "@/lib/types";
 
 export const PHASE_ORDER: StoryPhase[] = ["seed", "reveal", "edit", "transform", "pages", "finished"];
 
@@ -105,6 +105,44 @@ export function makeFallbackPages(state: StoryState): StoryPage[] {
       status: "draft",
     },
   ];
+}
+
+export function pageIllustrationUrls(
+  generationRecords: GenerationRecord[],
+  fallbackImageUrl: string | null,
+): Array<string | null> {
+  const scenes: string[] = [];
+  for (const record of generationRecords) {
+    if (record.kind !== "image") continue;
+    const imageUrl = record.assetUrl ?? record.partialAssetUrls?.at(-1);
+    if (imageUrl && !scenes.includes(imageUrl)) scenes.push(imageUrl);
+  }
+
+  const selected = scenes.slice(-3);
+  if (selected.length === 0) return [fallbackImageUrl, fallbackImageUrl, fallbackImageUrl];
+  if (selected.length === 1) return [selected[0], selected[0], selected[0]];
+  if (selected.length === 2) return [selected[0], selected[1], selected[1]];
+  return selected;
+}
+
+export function assignPageIllustrations(
+  pages: StoryPage[],
+  generationRecords: GenerationRecord[],
+  fallbackImageUrl: string | null,
+): StoryPage[] {
+  const illustrations = pageIllustrationUrls(generationRecords, fallbackImageUrl);
+  return pages.map((page, index) => ({ ...page, imageUrl: illustrations[index] ?? fallbackImageUrl }));
+}
+
+export function recoverCollapsedPageIllustrations(
+  pages: StoryPage[],
+  generationRecords: GenerationRecord[],
+  fallbackImageUrl: string | null,
+): StoryPage[] {
+  const distinctAssignedImages = new Set(pages.map((page) => page.imageUrl).filter(Boolean));
+  return distinctAssignedImages.size <= 1
+    ? assignPageIllustrations(pages, generationRecords, fallbackImageUrl)
+    : pages;
 }
 
 export function progressForPhase(phase: StoryPhase): number {

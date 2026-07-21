@@ -127,9 +127,34 @@ try {
   await verifyMedia(complete.imageUrl, "final generated illustration");
   pass("progressive image stream", `${partials.length} partial frame(s) plus final`);
 
+  const sceneUrls = [complete.imageUrl];
+  let latestVisualSession = complete.session;
+  for (const [index, prompt] of [
+    "The paper fox crosses a silver stream while carrying the fallen star, a distinct second story scene, handmade paper-cut art, no text.",
+    "The paper fox lifts the fallen star into the night sky from a hilltop, a joyful distinct final story scene, handmade paper-cut art, no text.",
+  ].entries()) {
+    const nextVisualResponse = await request(`/api/session/${sessionId}/visual`, {
+      method: "POST",
+      body: JSON.stringify({ intent: "advance", prompt, expectedRevision: latestVisualSession.state.revision }),
+    });
+    const nextEvents = await consumeVisualStream(nextVisualResponse);
+    const nextError = nextEvents.find((event) => event.type === "error");
+    if (nextError) throw new Error(`Page ${index + 2} image stream failed: ${nextError.error}`);
+    const nextComplete = nextEvents.find((event) => event.type === "complete");
+    if (!nextComplete?.imageUrl || !nextComplete.session) throw new Error(`Page ${index + 2} image stream returned no final scene.`);
+    generatedMediaUrls.push(...nextEvents.filter((event) => event.type === "partial").map((event) => event.imageUrl).filter(Boolean), nextComplete.imageUrl);
+    sceneUrls.push(nextComplete.imageUrl);
+    latestVisualSession = nextComplete.session;
+    await verifyMedia(nextComplete.imageUrl, `page ${index + 2} generated illustration`);
+  }
+
   const composed = await json(`/api/session/${sessionId}/compose`, { method: "POST" });
   if (composed.session.state.pages.length !== 3) throw new Error("Composition did not return exactly three pages.");
-  pass("three-page composition");
+  const pageImageUrls = composed.session.state.pages.map((page) => page.imageUrl);
+  if (new Set(pageImageUrls).size !== 3 || pageImageUrls.some((url, index) => url !== sceneUrls[index])) {
+    throw new Error("Composition did not preserve one independent illustration per page.");
+  }
+  pass("three-page composition", "three distinct page illustrations preserved");
 
   const titled = await json(`/api/session/${sessionId}/state`, {
     method: "PATCH",

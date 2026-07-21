@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BOOK_NARRATION_MODEL } from "@/lib/openai-models";
-import { cloneStoryState, createInitialStoryState, isFinishedBook } from "@/lib/story-state";
+import { assignPageIllustrations, cloneStoryState, createInitialStoryState, isFinishedBook, recoverCollapsedPageIllustrations } from "@/lib/story-state";
 import type { GenerationRecord, SavedStorySummary, SetupPreferences, StoryState, VisualIntent, WonderSession } from "@/lib/types";
 import { deletePrivateBlobs, listPrivateBlobs, readPrivateBlob, SESSION_BLOB_PREFIX, usesRemoteStorage, writePrivateBlob } from "@/server/blob-storage";
 
@@ -41,19 +41,25 @@ function loadPersistedSessions(): Map<string, WonderSession> {
 }
 
 function normalizeSession(session: WonderSession): WonderSession {
+  const generationRecords = session.generationRecords ?? [];
+  const state = {
+    ...createInitialStoryState(),
+    ...session.state,
+    titleConfirmed: session.state.titleConfirmed ?? (session.state.title !== "An Untold Wonder"),
+  };
+  const normalizedState = {
+    ...state,
+    pages: recoverCollapsedPageIllustrations(state.pages, generationRecords, state.currentImageUrl),
+  };
   return {
     ...session,
-    state: {
-      ...createInitialStoryState(),
-      ...session.state,
-      titleConfirmed: session.state.titleConfirmed ?? (session.state.title !== "An Untold Wonder"),
-    },
+    state: normalizedState,
     history: (session.history ?? []).map((state) => ({
       ...createInitialStoryState(),
       ...state,
       titleConfirmed: state.titleConfirmed ?? (state.title !== "An Untold Wonder"),
     })),
-    generationRecords: session.generationRecords ?? [],
+    generationRecords,
     completedAt: session.completedAt ?? null,
   };
 }
@@ -235,20 +241,27 @@ export function commitVisualIfCurrent(
   if (session.state.visualJobRevision !== expectedJobRevision) return { session: cloneSession(session), stale: true };
 
   const previousSharedImageUrl = session.state.currentImageUrl;
+  const record = [...session.generationRecords].reverse().find((item) => item.kind === "image" && item.jobRevision === expectedJobRevision);
+  const completedRecord = record ? { ...record, status: "complete" as const, assetUrl: imageUrl } : null;
+  const recordsWithCompletedImage = completedRecord
+    ? session.generationRecords.map((item) => item.id === completedRecord.id ? completedRecord : item)
+    : session.generationRecords;
+  const pages = record?.intent === "transform"
+    ? session.state.pages.map((page) => (
+        !page.imageUrl || page.imageUrl === previousSharedImageUrl ? { ...page, imageUrl } : page
+      ))
+    : assignPageIllustrations(session.state.pages, recordsWithCompletedImage, imageUrl);
   session.history = [...session.history.slice(-(MAX_HISTORY - 1)), cloneStoryState(session.state)];
   session.state = {
     ...session.state,
     currentImageUrl: imageUrl,
-    pages: session.state.pages.map((page) => (
-      !page.imageUrl || page.imageUrl === previousSharedImageUrl ? { ...page, imageUrl } : page
-    )),
+    pages,
     visualPrompt,
     visualStatus: "ready",
     visualError: "",
     imageRevision: session.state.imageRevision + 1,
     revision: session.state.revision + 1,
   };
-  const record = [...session.generationRecords].reverse().find((item) => item.kind === "image" && item.jobRevision === expectedJobRevision);
   if (record) {
     record.status = "complete";
     record.assetUrl = imageUrl;

@@ -135,6 +135,12 @@ current revision. A superseded job resolves as stale instead of painting an old
 idea over a newer one. Errors change the visual status to a retryable blocked
 state while preserving story text and decisions.
 
+Generated images also form a scene timeline. When pages are composed, the
+newest three independent visual artifacts are assigned to pages 1–3 in order;
+missing later scenes reuse the newest available image. If an older interrupted
+job saved progressive frames but no final event, its most detailed stored frame
+remains eligible instead of discarding the child's visible scene.
+
 ### 5. Page composition, title, and finalization
 
 `POST /api/session/:id/compose` arranges accepted story facts into three pages

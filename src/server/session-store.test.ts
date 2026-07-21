@@ -95,12 +95,39 @@ describe("session store", () => {
       ],
     }));
     const current = getSession(created.id)!;
-    const started = startVisualJob(created.id, current.state.revision);
+    const started = startVisualJob(created.id, current.state.revision, "transform");
     const result = commitVisualIfCurrent(created.id, started.jobRevision!, "/generated/shared-new.jpg", "new prompt");
 
     expect(result.session?.state.pages.map((page) => page.imageUrl)).toEqual([
       "/generated/shared-new.jpg",
       "/generated/shared-new.jpg",
+      "/generated/page-three.jpg",
+    ]);
+  });
+
+  it("keeps three advance scenes bound to three distinct story pages", () => {
+    const created = createSession(setup);
+    const first = startVisualJob(created.id, created.state.revision, "reveal", "first scene");
+    commitVisualIfCurrent(created.id, first.jobRevision!, "/generated/page-one.jpg", "first scene");
+    mutateSession(created.id, (state) => ({
+      ...state,
+      pages: [
+        { id: "one", pageNumber: 1, text: "First", imageUrl: state.currentImageUrl, childEditable: true, status: "ready" },
+        { id: "two", pageNumber: 2, text: "Second", imageUrl: state.currentImageUrl, childEditable: true, status: "ready" },
+        { id: "three", pageNumber: 3, text: "Third", imageUrl: state.currentImageUrl, childEditable: true, status: "ready" },
+      ],
+    }));
+
+    const afterFirst = getSession(created.id)!;
+    const second = startVisualJob(created.id, afterFirst.state.revision, "advance", "second scene");
+    commitVisualIfCurrent(created.id, second.jobRevision!, "/generated/page-two.jpg", "second scene");
+    const afterSecond = getSession(created.id)!;
+    const third = startVisualJob(created.id, afterSecond.state.revision, "advance", "third scene");
+    const result = commitVisualIfCurrent(created.id, third.jobRevision!, "/generated/page-three.jpg", "third scene");
+
+    expect(result.session?.state.pages.map((page) => page.imageUrl)).toEqual([
+      "/generated/page-one.jpg",
+      "/generated/page-two.jpg",
       "/generated/page-three.jpg",
     ]);
   });

@@ -1,8 +1,8 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { toFile } from "openai";
 import { z } from "zod";
-import type { Contributor, StoryPage, StoryPhase, StoryState, TurnPlan, VisualIntent } from "@/lib/types";
-import { makeFallbackPages } from "@/lib/story-state";
+import type { Contributor, GenerationRecord, StoryPage, StoryPhase, StoryState, TurnPlan, VisualIntent } from "@/lib/types";
+import { assignPageIllustrations, makeFallbackPages } from "@/lib/story-state";
 import { loadImageSource } from "@/server/image-assets";
 import { getOpenAI } from "@/server/openai";
 import { pageComposerInstructions, turnInstructions, visualStylePrompt } from "@/server/prompts";
@@ -61,7 +61,11 @@ export interface PageCompositionResult {
   error?: string;
 }
 
-export async function composePages(state: StoryState, safetyIdentifier: string): Promise<PageCompositionResult> {
+export async function composePages(
+  state: StoryState,
+  safetyIdentifier: string,
+  generationRecords: GenerationRecord[] = [],
+): Promise<PageCompositionResult> {
   try {
     const response = await getOpenAI().responses.parse({
       model: "gpt-5.6-luna",
@@ -73,19 +77,19 @@ export async function composePages(state: StoryState, safetyIdentifier: string):
     });
     if (!response.output_parsed) throw new Error("No parsed pages");
     return {
-      pages: response.output_parsed.pages.map((page, index) => ({
+      pages: assignPageIllustrations(response.output_parsed.pages.map((page, index) => ({
         id: crypto.randomUUID(),
         pageNumber: index + 1,
         text: page.text,
-        imageUrl: state.currentImageUrl,
+        imageUrl: null,
         childEditable: true,
         status: "ready" as const,
-      })),
+      })), generationRecords, state.currentImageUrl),
       usedFallback: false,
     };
   } catch (error) {
     return {
-      pages: makeFallbackPages(state),
+      pages: assignPageIllustrations(makeFallbackPages(state), generationRecords, state.currentImageUrl),
       usedFallback: true,
       error: error instanceof Error ? error.message : "The page composer did not return a usable result.",
     };

@@ -29,12 +29,13 @@ Repeated on 22 July 2026 after adding the private Blob runtime adapter:
 
 - Production build completed successfully and exposed every expected dynamic API route, including the private `/api/media/[...path]` proxy.
 - A disposable active session survived repeated process restarts during isolated cold-recovery testing and accepted a later contribution.
-- The live verifier passed 20 checks: setup, 12 concurrent session recoveries, Realtime token configuration, contribution, narrow edit, undo, structured guide turn, three streamed image partials and final image, media delivery, three-page composition, editable title and page, finalization, library inclusion, story route, Coral narration, narration caching, and cleanup.
+- The live verifier covers setup, 12 concurrent session recoveries, Realtime token configuration, contribution, narrow edit, undo, structured guide turns, streamed image partials and finals, three independent page illustrations, media delivery, three-page composition, editable title and page, finalization, library inclusion, story route, Coral narration, narration caching, and cleanup.
 - Live browser checks passed on desktop and 390 px mobile for welcome, setup, studio layout, AI disclosure, generated assets, keyboard access, reduced motion, and horizontal overflow.
 - A real headless WebRTC connection received a `gpt-realtime-2.1-mini` session using Marin, reached the listening/speaking flow, passed the output safety call, and disconnected cleanly.
 - The disposable completed book returned `404` after deletion, the live library returned empty, and the private Blob store contained no remaining session or media objects.
 - Error-level Vercel logs for the acceptance window were empty.
 - `wonderloom-openai.vercel.app` is the sole friendly WonderLoom alias. Vercel's immutable deployment URL still exists as part of the platform.
+- Page-illustration regression: a disposable live story generated three independent scenes, retained three distinct page URLs through composition, rendered each URL in the storybook, and removed all test media afterward. A read-only browser check also confirmed that a previously collapsed saved book recovered three distinct stored visual artifacts, including the best available progressive frame from an interrupted legacy job.
 
 ## Finished-book archive checks
 

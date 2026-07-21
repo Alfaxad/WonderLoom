@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addContribution, createInitialStoryState, makeFallbackPages, progressForPhase, replacePage } from "@/lib/story-state";
+import { addContribution, assignPageIllustrations, createInitialStoryState, makeFallbackPages, pageIllustrationUrls, progressForPhase, recoverCollapsedPageIllustrations, replacePage } from "@/lib/story-state";
+import type { GenerationRecord } from "@/lib/types";
 
 describe("story state", () => {
   it("records authorship without mutating the prior state", () => {
@@ -25,5 +26,55 @@ describe("story state", () => {
     const values = (["seed", "reveal", "edit", "transform", "pages", "finished"] as const).map(progressForPhase);
     expect(values).toEqual([...values].sort((a, b) => a - b));
     expect(values.at(-1)).toBe(100);
+  });
+
+  it("maps the latest three independently generated scenes across three pages", () => {
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+      { id: "one-edit", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "2", intent: "transform", assetUrl: "/one-edited.jpg" },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "3", intent: "advance", assetUrl: "/two.jpg" },
+      { id: "three", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "4", intent: "advance", assetUrl: "/three.jpg" },
+    ] satisfies GenerationRecord[];
+
+    expect(pageIllustrationUrls(records, null)).toEqual(["/one-edited.jpg", "/two.jpg", "/three.jpg"]);
+    const pages = makeFallbackPages(createInitialStoryState());
+    expect(assignPageIllustrations(pages, records, null).map((page) => page.imageUrl)).toEqual([
+      "/one-edited.jpg",
+      "/two.jpg",
+      "/three.jpg",
+    ]);
+  });
+
+  it("recovers the best stored progressive frame when a legacy image job never reached final completion", () => {
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "partial", startedAt: "1", intent: "reveal", partialAssetUrls: ["/one-sketch.jpg", "/one-details.jpg"] },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "2", intent: "transform", assetUrl: "/two.jpg" },
+      { id: "three", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "3", intent: "reveal", assetUrl: "/three.jpg" },
+    ] satisfies GenerationRecord[];
+    expect(pageIllustrationUrls(records, null)).toEqual(["/one-details.jpg", "/two.jpg", "/three.jpg"]);
+  });
+
+  it("uses the newest available scene for pages that do not yet have an independent image", () => {
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "2", intent: "advance", assetUrl: "/two.jpg" },
+    ] satisfies GenerationRecord[];
+    expect(pageIllustrationUrls(records, null)).toEqual(["/one.jpg", "/two.jpg", "/two.jpg"]);
+  });
+
+  it("repairs legacy books whose three page images collapsed to the final scene", () => {
+    const state = createInitialStoryState();
+    const pages = makeFallbackPages(state).map((page) => ({ ...page, imageUrl: "/three.jpg" }));
+    const records = [
+      { id: "one", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "1", intent: "reveal", assetUrl: "/one.jpg" },
+      { id: "two", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "2", intent: "advance", assetUrl: "/two.jpg" },
+      { id: "three", kind: "image", model: "gpt-image-2", status: "complete", startedAt: "3", intent: "advance", assetUrl: "/three.jpg" },
+    ] satisfies GenerationRecord[];
+
+    expect(recoverCollapsedPageIllustrations(pages, records, "/three.jpg").map((page) => page.imageUrl)).toEqual([
+      "/one.jpg",
+      "/two.jpg",
+      "/three.jpg",
+    ]);
   });
 });
