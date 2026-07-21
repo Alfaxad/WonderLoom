@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+.next/
+out/
+coverage/
+*.log
+*.tsbuildinfo
+public/generated/
+data/wonderloom/
+.env*
+!.env.example
+.vercel/
+playwright-report/
+test-results/
+plans/
